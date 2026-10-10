@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------------------
+# GestureFlow AI
+# ---------------------------------------------------------------------------
+# Personal data: recorded landmark examples, trained models, profiles, settings.
+# This folder is created at runtime and must NEVER be committed.
+user_data/
+
+# Downloaded MediaPipe model files and models you train yourself.
+models/
+*.task
+*.joblib
+*.pkl
+*.pickle
+*.onnx
+
+# Raw video / images should never be saved by default, but just in case.
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Test / lint / coverage caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Editors and operating systems
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

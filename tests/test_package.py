@@ -1,4 +1,4 @@
-"""Smoke tests: the package imports and the entry point runs."""
+"""Smoke tests: the package imports and the command-line entry point works."""
 
 import re
 import subprocess
@@ -12,9 +12,11 @@ def test_version_is_semver():
     assert re.fullmatch(r"\d+\.\d+\.\d+", gestureflow.__version__)
 
 
-def test_main_returns_success(capsys):
-    assert main([]) == 0
-    assert "installed correctly" in capsys.readouterr().out
+def test_check_returns_success(capsys):
+    assert main(["--check"]) == 0
+    out = capsys.readouterr().out
+    assert "installed correctly" in out
+    assert "Hand model:" in out
 
 
 def test_python_dash_m_runs():

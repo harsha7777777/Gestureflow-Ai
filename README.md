@@ -35,8 +35,8 @@ If you already have Python 3.12 and Git (on macOS, use `python3` in place of `py
 until the virtual environment is active):
 
 ```bash
-git clone https://github.com/harsha7777777/gestureflow-ai.git
-cd gestureflow-ai
+git clone https://github.com/harsha7777777/Gestureflow-Ai.git
+cd Gestureflow-Ai
 python -m venv .venv
 ```
 

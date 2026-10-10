@@ -23,8 +23,8 @@ classifiers = [
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.urls]
-Homepage = "https://github.com/harsha7777777/gestureflow-ai"
-Issues = "https://github.com/harsha7777777/gestureflow-ai/issues"
+Homepage = "https://github.com/harsha7777777/Gestureflow-Ai"
+Issues = "https://github.com/harsha7777777/Gestureflow-Ai/issues"
 
 [project.scripts]
 gestureflow = "gestureflow.__main__:main"

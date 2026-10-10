@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from gestureflow import __version__
 from gestureflow.camera.capture import CameraInfo, camera_help, list_cameras
 from gestureflow.ui.capture_worker import CaptureWorker
+from gestureflow.ui.record_panel import RecordPanel
 
 PRIVACY_NOTE = "Video is processed on this computer only and is never saved."
 
@@ -29,6 +30,7 @@ class MainWindow(QMainWindow):
         find_cameras: Callable[[], list[CameraInfo]] = list_cameras,
         make_worker: Callable[..., CaptureWorker] = CaptureWorker,
         initial_camera: int | None = None,
+        record_panel: RecordPanel | None = None,
     ) -> None:
         super().__init__()
         self._find_cameras = find_cameras
@@ -36,9 +38,10 @@ class MainWindow(QMainWindow):
         self._initial_camera = initial_camera
         self._thread: QThread | None = None
         self._worker: CaptureWorker | None = None
+        self.record_panel = record_panel or RecordPanel()
 
         self.setWindowTitle(f"GestureFlow AI {__version__}")
-        self.resize(820, 700)
+        self.resize(1150, 700)
         self._build_ui()
 
     # ------------------------------------------------------------------ layout
@@ -85,11 +88,15 @@ class MainWindow(QMainWindow):
         bottom.addStretch()
         bottom.addWidget(privacy)
 
-        layout = QVBoxLayout()
-        layout.addLayout(top)
-        layout.addWidget(self.video_label, stretch=1)
-        layout.addWidget(self.retry_button, alignment=Qt.AlignmentFlag.AlignCenter)
-        layout.addLayout(bottom)
+        video_column = QVBoxLayout()
+        video_column.addLayout(top)
+        video_column.addWidget(self.video_label, stretch=1)
+        video_column.addWidget(self.retry_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        video_column.addLayout(bottom)
+
+        layout = QHBoxLayout()
+        layout.addLayout(video_column, stretch=1)
+        layout.addWidget(self.record_panel)
 
         central = QWidget()
         central.setLayout(layout)
@@ -144,11 +151,14 @@ class MainWindow(QMainWindow):
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.frame_ready.connect(self._on_frame)
+        self._worker.hands_ready.connect(self.record_panel.on_hands)
         self._worker.error.connect(self.show_error)
         self._worker.finished.connect(self._thread.quit)
         self._thread.start()
 
     def _stop_capture(self) -> None:
+        if self.record_panel.is_recording:
+            self.record_panel.cancel_recording()  # a half-recorded example is useless
         if self._worker is not None:
             self._worker.stop()
         if self._thread is not None:

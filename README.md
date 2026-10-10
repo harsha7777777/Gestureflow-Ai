@@ -4,8 +4,8 @@
 
 <!-- Demo GIF goes here once Milestone 4 is done. -->
 
-> **Status: early development (Milestone 1 of 7).** The live webcam view with hand tracking works.
-> Gesture training and computer control come next. See the [roadmap](ROADMAP.md).
+> **Status: early development (Milestone 2 of 7).** Live hand tracking and recording your own
+> gesture examples work. Training and computer control come next. See the [roadmap](ROADMAP.md).
 
 ## What it does
 
@@ -98,6 +98,29 @@ python -m gestureflow --check           # check the installation
 **Allow**, then quit Terminal completely (Cmd+Q), reopen it and run the app again. See
 [docs/permissions.md](docs/permissions.md).
 
+## Record your gesture examples
+
+The panel on the right of the window records examples of your gestures. Only the 21 hand
+landmark coordinates are saved, never images or video.
+
+1. Type a name, for example `thumbs_up` or `swipe_left`.
+2. Choose **Pose (hold still)** for a hand shape, or **Movement (swipe)** for a motion.
+3. Click **Record example**. After a 3-second countdown, hold the pose for 1 second, or do the
+   movement within 2 seconds. Start moving when the panel says **Do the movement now**, not during
+   the countdown.
+4. Repeat 5–15 times. Vary your hand position, distance and angle a little each time.
+5. Record some examples named **`neutral`**: your hand resting, typing, scratching your head,
+   moving casually. This teaches the app when to do *nothing*.
+
+A movement only counts if your hand really moves: either it travels about a palm's width across
+the frame (a swipe, even one that comes back), or the fingers clearly change shape without the hand
+going anywhere (a grab, a pinch, opening the hand). Otherwise the recording is rejected with a
+message saying how far you got. **Undo last** deletes the most recent example of the
+selected gesture.
+
+Examples are stored in `user_data/gestures/<name>/`, one small JSON file each. You can delete
+that folder at any time. Training on these examples arrives in Milestone 3.
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -139,9 +162,10 @@ can remap a gesture without retraining. Details: [docs/architecture.md](docs/arc
 
 ## Privacy
 
-Webcam frames are processed in memory and discarded. Only hand landmark coordinates of the
-examples you choose to record are stored, in the local `user_data/` folder, which you can delete
-at any time.
+Webcam frames are processed in memory and discarded; no image or video is ever written to disk.
+Only the hand landmark coordinates (21 points per frame) of the examples you choose to record are
+stored, in the local `user_data/` folder, which you can delete at any time. Nothing is sent over
+the network (the one exception is the one-time hand model download).
 
 ## Known limitations
 

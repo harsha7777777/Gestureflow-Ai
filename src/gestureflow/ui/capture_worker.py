@@ -22,6 +22,8 @@ from gestureflow.ui.drawing import draw_hands
 class CaptureWorker(QObject):
     # image to show, current FPS, short description of what was detected
     frame_ready = Signal(QImage, float, str)
+    # raw detections (list of HandLandmarks) and the frame time in ms, for recording
+    hands_ready = Signal(object, int)
     # a user-facing error message; the worker stops after sending it
     error = Signal(str)
     finished = Signal()
@@ -60,7 +62,9 @@ class CaptureWorker(QObject):
                         # Selfie view: moving your hand right moves it right on screen.
                         frame = cv2.flip(frame, 1)
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    hands = detector.detect(rgb, time.monotonic_ns() // 1_000_000)
+                    t_ms = time.monotonic_ns() // 1_000_000
+                    hands = detector.detect(rgb, t_ms)
+                    self.hands_ready.emit(hands, t_ms)
                     draw_hands(rgb, hands)
                     self.frame_ready.emit(to_qimage(rgb), fps.tick(), describe(hands))
                     # The frame is discarded here: nothing is ever written to disk.

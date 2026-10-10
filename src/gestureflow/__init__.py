@@ -9,4 +9,4 @@ See docs/architecture.md for the full picture and the rules that keep the
 stages independent of each other.
 """
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"

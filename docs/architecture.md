@@ -30,6 +30,25 @@ flowchart LR
 | storage | | JSON settings, profiles, mappings; landmark recordings | `gestureflow/storage` |
 | ui | | PySide6 windows | `gestureflow/ui` |
 
+## Features (Milestone 2)
+
+**Static poses** (78 numbers per frame): landmarks with x multiplied by the image aspect ratio,
+translated to the wrist and divided by hand size (wrist to middle-finger knuckle); plus the 10
+distances between fingertips and how extended each finger is (fingertip-to-wrist divided by
+knuckle-to-wrist). Moving the hand around the frame or closer to the camera doesn't change them.
+
+**Movements** (113 numbers per window): the window is resampled by time to 16 steps so speed and
+frame rate don't matter; then the palm-center path relative to its start (in hand sizes), the net
+displacement, the path length and the average pose.
+
+**Motion check:** before a window is ever treated as a movement, the palm must have travelled at
+least one hand size from start to end (`features/dynamic.py: has_enough_motion`). Net distance is
+used, not path length, so a hand that rests at the edge of the frame or wobbles in place never
+counts. This is a fixed rule, so it can't be "unlearned" by a badly trained model.
+
+**Recorded examples** are JSON files under `user_data/gestures/<name>/` holding landmarks and
+timestamps only (format described in `storage/samples.py`).
+
 ## Rules
 
 1. **The classifier knows nothing about OS actions.** It predicts gesture *names*.

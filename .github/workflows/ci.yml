@@ -64,6 +64,14 @@ jobs:
       - name: Download the hand model
         # Also tests the real download path, including the SHA-256 check.
         run: python -m gestureflow --download-model
+      - name: Start the real hand detector once
+        # Runs outside pytest so MediaPipe's own log messages are visible if it fails.
+        run: >-
+          python -c "import numpy as np;
+          from gestureflow.detection.hand_detector import HandDetector;
+          d = HandDetector();
+          print('hands found in a blank frame:', d.detect(np.zeros((480, 640, 3), np.uint8), 0));
+          d.close()"
       - name: Run tests
         # Tests never need a webcam; camera-only tests are marked and skipped.
         run: pytest -m "not camera"

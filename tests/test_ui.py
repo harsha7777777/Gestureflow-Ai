@@ -264,3 +264,29 @@ def test_threshold_slider_updates_recognizer(qapp, tmp_path):
     panel.threshold_slider.setValue(90)
     assert panel._recognizer.threshold == 0.9
     assert panel.threshold_label.text() == "90%"
+
+
+def test_record_panel_keeps_one_type_per_gesture(qapp, tmp_path):
+    from tests.conftest import make_swipe_sample
+
+    save_sample(make_swipe_sample("volume_up", 0.3, 1), tmp_path)
+    panel = RecordPanel(root=tmp_path, countdown_ms=0)
+    assert panel.counts_list.item(0).text() == "volume_up: 1 movement"
+
+    # Typing an existing name selects its type...
+    panel.name_box.setEditText("volume_up")
+    assert panel.dynamic_radio.isChecked()
+    # ...and recording it as the other type is refused with an explanation.
+    panel.static_radio.setChecked(True)
+    panel.start_recording()
+    assert not panel.is_recording
+    assert "already a movement" in panel.status_label.text()
+
+
+def test_record_panel_flags_mixed_gestures(qapp, tmp_path):
+    from tests.conftest import make_pose_sample, make_swipe_sample
+
+    save_sample(make_pose_sample("pause", "open", 1), tmp_path)
+    save_sample(make_swipe_sample("pause", 0.3, 2), tmp_path)
+    panel = RecordPanel(root=tmp_path)
+    assert panel.counts_list.item(0).text() == "pause: 1 pose, 1 movement (mixed! keep one type)"

@@ -62,3 +62,16 @@ def test_train_from_terminal_without_examples(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("GESTUREFLOW_USER_DATA_DIR", str(tmp_path))
     assert main(["--train"]) == 1
     assert "Not enough to train" in capsys.readouterr().err
+
+
+def test_delete_examples_from_terminal(monkeypatch, tmp_path, capsys):
+    from gestureflow.storage.samples import count_by_kind, save_sample
+    from tests.conftest import make_pose_sample, make_swipe_sample
+
+    monkeypatch.setenv("GESTUREFLOW_USER_DATA_DIR", str(tmp_path))
+    save_sample(make_pose_sample("pause", "open", 1))
+    save_sample(make_swipe_sample("pause", 0.3, 2))
+    assert main(["--delete-examples", "pause", "--kind", "pose"]) == 0
+    assert "Deleted 1 pose example of 'pause'." in capsys.readouterr().out
+    assert count_by_kind() == {"pause": {"dynamic": 1}}
+    assert main(["--delete-examples", "pause"]) == 2  # --kind is required

@@ -5,6 +5,8 @@ python -m gestureflow --camera 1         start with a specific camera
 python -m gestureflow --download-model   download the hand model and exit
 python -m gestureflow --check            check the installation and exit
 python -m gestureflow --train            train on your recorded examples and exit
+python -m gestureflow --delete-examples pause --kind pose
+                                         delete one gesture's pose (or movement) examples
 """
 
 import argparse
@@ -31,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--check", action="store_true", help="check the installation and exit")
     parser.add_argument(
         "--train", action="store_true", help="train on your recorded examples, print results, exit"
+    )
+    parser.add_argument(
+        "--delete-examples", metavar="NAME", help="delete examples of this gesture (needs --kind)"
+    )
+    parser.add_argument(
+        "--kind", choices=("pose", "movement"), help="which examples --delete-examples removes"
     )
     return parser
 
@@ -111,6 +119,26 @@ def train_from_terminal() -> int:
     return 0
 
 
+def delete_examples(name: str, kind: str | None) -> int:
+    from gestureflow.storage.samples import SampleError, count_by_kind, delete_samples_of_kind
+
+    if kind is None:
+        print(
+            "Add --kind pose or --kind movement to say which examples to delete.", file=sys.stderr
+        )
+        return 2
+    try:
+        deleted = delete_samples_of_kind(name, "static" if kind == "pose" else "dynamic")
+    except SampleError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    print(f"Deleted {deleted} {kind} example{'s' if deleted != 1 else ''} of '{name}'.")
+    for gesture, kinds in count_by_kind().items():
+        parts = [f"{n} {'pose' if k == 'static' else 'movement'}" for k, n in sorted(kinds.items())]
+        print(f"  {gesture}: {', '.join(parts)}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.check:
@@ -119,6 +147,8 @@ def main(argv: list[str] | None = None) -> int:
         return download()
     if args.train:
         return train_from_terminal()
+    if args.delete_examples:
+        return delete_examples(args.delete_examples, args.kind)
 
     # Imported here so --check and --download-model work even if Qt can't start.
     from gestureflow.ui.app import run_app

@@ -119,6 +119,14 @@ going anywhere (a grab, a pinch, opening the hand). Otherwise the recording is r
 message saying how far you got. **Undo last** deletes the most recent example of the
 selected gesture.
 
+Each gesture is either a pose or a movement, not both. Typing an existing name selects its type,
+and recording it as the other type is refused. If a gesture shows "(mixed! keep one type)", delete
+the examples of the wrong type from the Terminal, for example:
+
+```bash
+python -m gestureflow --delete-examples pause --kind pose
+```
+
 Examples are stored in `user_data/gestures/<name>/`, one small JSON file each. You can delete
 that folder at any time.
 

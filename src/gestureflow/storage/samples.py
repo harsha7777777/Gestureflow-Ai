@@ -175,6 +175,45 @@ def count_samples(root: Path | None = None) -> dict[str, int]:
     }
 
 
+def _kind_of(path: Path) -> str | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("kind")
+    except (OSError, ValueError):
+        return None
+
+
+def count_by_kind(root: Path | None = None) -> dict[str, dict[str, int]]:
+    """Examples per gesture and kind, e.g. {"pause": {"static": 1, "dynamic": 4}}."""
+    base = root or gestures_dir()
+    if not base.is_dir():
+        return {}
+    counts: dict[str, dict[str, int]] = {}
+    for folder in sorted(base.iterdir()):
+        if not folder.is_dir():
+            continue
+        for path in folder.glob("*.json"):
+            kind = _kind_of(path)
+            if kind in KINDS:
+                counts.setdefault(folder.name, {}).setdefault(kind, 0)
+                counts[folder.name][kind] += 1
+    return counts
+
+
+def delete_samples_of_kind(gesture: str, kind: str, root: Path | None = None) -> int:
+    """Delete the examples of one gesture that have the given kind. Returns how many."""
+    if kind not in KINDS:
+        raise SampleError(f"kind must be one of {KINDS}, not {kind!r}")
+    folder = (root or gestures_dir()) / clean_gesture_name(gesture)
+    deleted = 0
+    for path in sorted(folder.glob("*.json")) if folder.is_dir() else []:
+        if _kind_of(path) == kind:
+            path.unlink()
+            deleted += 1
+    if folder.is_dir() and not any(folder.iterdir()):
+        folder.rmdir()
+    return deleted
+
+
 def delete_gesture(gesture: str, root: Path | None = None) -> int:
     """Delete all examples of one gesture. Returns how many were deleted."""
     folder = (root or gestures_dir()) / clean_gesture_name(gesture)

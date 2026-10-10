@@ -63,3 +63,72 @@ def make_swipe(dx=0.3, dy=0.0, frames=30, fps=30, start=(0.35, 0.5), size=0.3, j
 @pytest.fixture
 def open_hand() -> HandLandmarks:
     return make_open_hand()
+
+
+def make_half_curled(center=(0.5, 0.5), size=0.3) -> HandLandmarks:
+    """Something between open and fist: a relaxed, ordinary hand (good neutral)."""
+    open_pts = make_open_hand(center, size).points
+    fist_pts = make_fist(center, size).points
+    return HandLandmarks(points=(open_pts + fist_pts) / 2, handedness="Right", score=0.95)
+
+
+SHAPES = {"open": make_open_hand, "fist": make_fist, "relaxed": make_half_curled}
+
+
+def make_pose_sample(gesture, shape, seed, frames=30):
+    """A recorded pose example with a little natural variation, like a real recording."""
+    from gestureflow.storage.samples import Sample
+
+    rng = np.random.default_rng(seed)
+    center = (0.35 + 0.3 * rng.random(), 0.35 + 0.3 * rng.random())
+    size = 0.22 + 0.12 * rng.random()
+    base = SHAPES[shape](center, size).points
+    seq = [base + rng.normal(0, 0.002, base.shape).astype(np.float32) for _ in range(frames)]
+    return Sample(gesture, "static", np.stack(seq), np.arange(frames) * 33, "Right", 1.0)
+
+
+def make_swipe_sample(gesture, dx, seed, dy=0.0, frames=60):
+    """A recorded movement example: still, swipe in the middle, still (2 s at 30 fps)."""
+    from gestureflow.storage.samples import Sample
+
+    rng = np.random.default_rng(seed)
+    size = 0.22 + 0.1 * rng.random()
+    start = (0.5 - dx / 2 + 0.05 * rng.normal(), 0.5 - dy / 2 + 0.05 * rng.normal())
+    seq = []
+    for i in range(frames):
+        f = min(max((i - 15) / 25, 0.0), 1.0)  # moves during frames 15-40
+        center = (start[0] + dx * f, start[1] + dy * f)
+        points = make_open_hand(center, size).points
+        seq.append(points + rng.normal(0, 0.002, points.shape).astype(np.float32))
+    return Sample(gesture, "dynamic", np.stack(seq), np.arange(frames) * 33, "Right", 1.0)
+
+
+def make_neutral_movement_sample(seed, frames=60):
+    """Ordinary motion: a relaxed hand drifting slowly and wobbling (not a swipe)."""
+    from gestureflow.storage.samples import Sample
+
+    rng = np.random.default_rng(seed)
+    size = 0.22 + 0.1 * rng.random()
+    angle = rng.random() * 2 * np.pi
+    seq = []
+    for i in range(frames):
+        drift = 0.04 * i / frames
+        wobble = 0.02 * np.sin(i / 4 + angle)
+        center = (0.5 + drift * np.cos(angle) + wobble, 0.5 + drift * np.sin(angle))
+        points = make_half_curled(center, size).points
+        seq.append(points + rng.normal(0, 0.002, points.shape).astype(np.float32))
+    return Sample("neutral", "dynamic", np.stack(seq), np.arange(frames) * 33, "Right", 1.0)
+
+
+def make_training_set(per_gesture=5):
+    """Poses: palm, fist (+ neutral relaxed hand). Movements: swipe_left, swipe_right
+    (+ neutral motion)."""
+    samples = []
+    for i in range(per_gesture):
+        samples.append(make_pose_sample("palm", "open", seed=100 + i))
+        samples.append(make_pose_sample("fist", "fist", seed=200 + i))
+        samples.append(make_pose_sample("neutral", "relaxed", seed=300 + i))
+        samples.append(make_swipe_sample("swipe_right", 0.3, seed=400 + i))
+        samples.append(make_swipe_sample("swipe_left", -0.3, seed=500 + i))
+        samples.append(make_neutral_movement_sample(seed=600 + i))
+    return samples

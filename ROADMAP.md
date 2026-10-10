@@ -4,7 +4,7 @@
 - [x] M0: Repository setup, tests and CI
 - [x] M1: Live webcam view with hand landmarks, FPS, camera selection
 - [x] M2: Feature extraction and recording labeled examples (landmarks only)
-- [ ] M3: Training, evaluation and live recognition with safety filter
+- [x] M3: Training, evaluation and live recognition with safety filter
 - [ ] M4: Gesture-to-command mapping and first macOS actions, emergency hotkey
 
 ## v0.2.0: Full app

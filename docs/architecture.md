@@ -51,6 +51,35 @@ counts. This is a fixed rule, so it can't be "unlearned" by a badly trained mode
 **Recorded examples** are JSON files under `user_data/gestures/<name>/` holding landmarks and
 timestamps only (format described in `storage/samples.py`).
 
+## Training and recognition (Milestone 3)
+
+**Two models.** Poses and movements are different problems, so each gets its own classifier
+(`training/trainer.py`). The pose model learns from single frames (every frame of a pose example
+is a row). The movement model learns from whole windows (each movement example plus a few
+shorter crops of it, because the live sliding window rarely lines up exactly with a movement).
+`neutral` examples of either kind are a class in the pose model; neutral movements are a class
+in the movement model.
+
+**Honest evaluation.** Two algorithms (random forest, SVM with calibrated probabilities) are
+compared with k-fold cross-validation over whole *examples* (k = up to 5, limited by the
+gesture with the fewest examples). Frames from one example never appear in both the training and
+the test part, which would inflate the accuracy. Pose frames of a held-out example are averaged
+into one guess per example, so the confusion matrix counts examples. The algorithm with the
+higher held-out accuracy is then trained on everything (ties go to the random forest).
+
+**Live recognition** (`recognition/recognizer.py`): poses are only read while the palm is still
+(moved less than 0.35 hand sizes in the last 0.3 s); movements are only read while it is not
+still and the last 1.5 s pass the motion check. Each path feeds a `RecognitionFilter`
+(`recognition/filter.py`): confidence threshold, smoothing (12 of 15 frames for poses, 2 of 3
+windows for movements), neutral never fires, a gesture must be released before it can fire
+again, and a per-gesture cooldown (1.5 s). After a movement fires, the window is cleared and
+nothing fires for 0.8 s. The filter only sees names and numbers, so future inputs (eye tracking,
+voice) can reuse it.
+
+**Model file:** `user_data/trained/gesture_model.joblib` (joblib/pickle, from scikit-learn).
+Pickle files can run code when loaded, so the app only loads the model it trained itself;
+profile import/export (M5) will use JSON, never model files.
+
 ## Rules
 
 1. **The classifier knows nothing about OS actions.** It predicts gesture *names*.

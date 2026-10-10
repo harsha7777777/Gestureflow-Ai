@@ -29,9 +29,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Windows is the primary development OS; macOS (Apple Silicon) and
-        # Linux catch platform-specific breakage early.
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        # macOS (Apple Silicon) is the primary development OS; Windows is the
+        # second target, and Linux catches platform-specific breakage early.
+        os: [macos-latest, windows-latest, ubuntu-latest]
         python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4

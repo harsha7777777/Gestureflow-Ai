@@ -14,7 +14,7 @@ ruff check .
 pytest
 ```
 
-CI runs the same checks on Windows, macOS and Linux.
+CI runs the same checks on macOS, Windows and Linux.
 
 ## Ground rules
 

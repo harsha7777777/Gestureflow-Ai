@@ -19,4 +19,5 @@ PySide6==6.12.0
 
 # Added in later milestones (with an explanation at that time):
 #   pynput        - keyboard/mouse actions (M4)
-#   pycaw         - Windows volume control (M4, Windows only)
+#   pycaw         - Windows volume control (M7, Windows only)
+# macOS volume uses the built-in `osascript` command, so it needs no package.

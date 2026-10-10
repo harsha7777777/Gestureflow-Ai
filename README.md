@@ -22,7 +22,7 @@ to an action such as play/pause, volume, next track, screenshot or back/forward.
 
 | | |
 |---|---|
-| OS | Windows 10/11 (primary), macOS 11+ on Apple Silicon |
+| OS | macOS 11+ on Apple Silicon (M1 or newer, primary), Windows 10/11 |
 | Python | 3.12 or 3.13 (3.12 recommended) |
 | Hardware | Any webcam |
 
@@ -31,7 +31,8 @@ Intel Macs are not supported because MediaPipe does not publish packages for the
 ## Install (developer preview)
 
 Full beginner-friendly instructions for Windows and macOS will be added as features land.
-If you already have Python 3.12 and Git:
+If you already have Python 3.12 and Git (on macOS, use `python3` in place of `python`
+until the virtual environment is active):
 
 ```bash
 git clone https://github.com/harsha7777777/gestureflow-ai.git
@@ -41,8 +42,8 @@ python -m venv .venv
 
 Activate the virtual environment:
 
-- Windows (PowerShell): `.venv\Scripts\Activate.ps1`
 - macOS: `source .venv/bin/activate`
+- Windows (PowerShell): `.venv\Scripts\Activate.ps1`
 
 Then install and run:
 
@@ -71,7 +72,7 @@ flowchart LR
     C --> D[Classifier]
     D --> E[Recognition filter<br/>threshold, smoothing,<br/>neutral, cooldown]
     E --> F[Gesture to command<br/>mapping]
-    F --> G[Action layer<br/>Windows / macOS]
+    F --> G[Action layer<br/>macOS / Windows]
     G --> H[Operating system]
 ```
 

@@ -1,4 +1,4 @@
-"""Main window: live camera view with hand landmarks, FPS and camera selection."""
+"""Main window: live camera view on the left, Record and Train & test tabs on the right."""
 
 from collections.abc import Callable
 
@@ -11,7 +11,9 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -20,6 +22,7 @@ from gestureflow import __version__
 from gestureflow.camera.capture import CameraInfo, camera_help, list_cameras
 from gestureflow.ui.capture_worker import CaptureWorker
 from gestureflow.ui.record_panel import RecordPanel
+from gestureflow.ui.train_panel import TrainPanel
 
 PRIVACY_NOTE = "Video is processed on this computer only and is never saved."
 
@@ -31,6 +34,7 @@ class MainWindow(QMainWindow):
         make_worker: Callable[..., CaptureWorker] = CaptureWorker,
         initial_camera: int | None = None,
         record_panel: RecordPanel | None = None,
+        train_panel: TrainPanel | None = None,
     ) -> None:
         super().__init__()
         self._find_cameras = find_cameras
@@ -39,9 +43,10 @@ class MainWindow(QMainWindow):
         self._thread: QThread | None = None
         self._worker: CaptureWorker | None = None
         self.record_panel = record_panel or RecordPanel()
+        self.train_panel = train_panel or TrainPanel()
 
         self.setWindowTitle(f"GestureFlow AI {__version__}")
-        self.resize(1150, 700)
+        self.resize(1250, 760)
         self._build_ui()
 
     # ------------------------------------------------------------------ layout
@@ -94,9 +99,17 @@ class MainWindow(QMainWindow):
         video_column.addWidget(self.retry_button, alignment=Qt.AlignmentFlag.AlignCenter)
         video_column.addLayout(bottom)
 
+        train_scroll = QScrollArea()
+        train_scroll.setWidget(self.train_panel)
+        train_scroll.setWidgetResizable(True)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self.record_panel, "Record")
+        self.tabs.addTab(train_scroll, "Train && test")
+        self.tabs.setMinimumWidth(380)
+
         layout = QHBoxLayout()
         layout.addLayout(video_column, stretch=1)
-        layout.addWidget(self.record_panel)
+        layout.addWidget(self.tabs)
 
         central = QWidget()
         central.setLayout(layout)
@@ -152,6 +165,7 @@ class MainWindow(QMainWindow):
         self._thread.started.connect(self._worker.run)
         self._worker.frame_ready.connect(self._on_frame)
         self._worker.hands_ready.connect(self.record_panel.on_hands)
+        self._worker.hands_ready.connect(self.train_panel.on_hands)
         self._worker.error.connect(self.show_error)
         self._worker.finished.connect(self._thread.quit)
         self._thread.start()
@@ -197,4 +211,5 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt's method name)
         self._stop_capture()
+        self.train_panel.shutdown()
         super().closeEvent(event)

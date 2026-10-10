@@ -7,11 +7,15 @@ import numpy as np
 import pytest
 
 from gestureflow.camera.capture import CameraError, CameraInfo
-from gestureflow.storage.samples import count_samples, load_samples
+from gestureflow.storage.samples import count_samples, load_samples, save_sample
+from gestureflow.training.model import model_file
 from gestureflow.ui.capture_worker import CaptureWorker, describe
 from gestureflow.ui.main_window import MainWindow
 from gestureflow.ui.record_panel import RecordPanel
-from tests.conftest import make_open_hand
+from gestureflow.ui.train_panel import TrainPanel
+from tests.conftest import make_fist, make_open_hand, make_training_set
+
+NOWHERE = Path("/nonexistent")
 
 
 class FakeCamera:
@@ -94,7 +98,9 @@ def test_worker_reports_camera_errors(qapp):
 
 def test_window_without_camera_shows_help(qapp):
     window = MainWindow(
-        find_cameras=lambda: [], record_panel=RecordPanel(root=Path("/nonexistent"))
+        find_cameras=lambda: [],
+        record_panel=RecordPanel(root=NOWHERE),
+        train_panel=TrainPanel(NOWHERE, NOWHERE),
     )
     window.refresh_cameras()
     assert "No camera found" in window.video_label.text()
@@ -109,7 +115,8 @@ def test_window_shows_live_frames(qapp, camera_cls):
     window = MainWindow(
         find_cameras=lambda: cameras,
         make_worker=fake_worker_factory(camera_cls),
-        record_panel=RecordPanel(root=Path("/nonexistent")),
+        record_panel=RecordPanel(root=NOWHERE),
+        train_panel=TrainPanel(NOWHERE, NOWHERE),
     )
     window.show()
     window.refresh_cameras()
@@ -134,7 +141,8 @@ def test_window_shows_camera_error(qapp):
     window = MainWindow(
         find_cameras=lambda: [CameraInfo(0, "Camera 0")],
         make_worker=fake_worker_factory(BrokenCamera),
-        record_panel=RecordPanel(root=Path("/nonexistent")),
+        record_panel=RecordPanel(root=NOWHERE),
+        train_panel=TrainPanel(NOWHERE, NOWHERE),
     )
     window.refresh_cameras()
     assert wait_until(qapp, lambda: "Could not open camera" in window.video_label.text())
@@ -199,3 +207,60 @@ def test_record_panel_ignores_frames_when_idle(qapp, tmp_path):
     panel = RecordPanel(root=tmp_path, countdown_ms=0)
     panel.on_hands([make_open_hand()], 0)
     assert count_samples(tmp_path) == {}
+
+
+# ------------------------------------------------------------------ train panel
+
+
+def test_train_panel_without_model_explains_next_step(qapp, tmp_path):
+    panel = TrainPanel(tmp_path / "gestures", tmp_path / "trained")
+    assert "No trained model yet" in panel.train_status.text()
+    assert not panel.live_button.isEnabled()
+
+
+def test_train_panel_trains_tests_and_recognizes(qapp, tmp_path):
+    gestures, trained = tmp_path / "gestures", tmp_path / "trained"
+    for sample in make_training_set():
+        save_sample(sample, gestures)
+    panel = TrainPanel(gestures, trained)
+    panel.start_training()
+    assert wait_until(qapp, lambda: not panel.is_training, timeout=120)
+    assert "Training finished" in panel.train_status.text(), panel.train_status.text()
+    assert model_file(trained).exists()
+    assert "Poses: 20 of 20 held-out examples correct" in panel.results_label.text()
+    assert not panel.pose_table.isHidden() and panel.pose_table.rowCount() == 3
+    assert panel.live_button.isEnabled()
+
+    # Live test: a held fist is recognized once and only shown, never acted on.
+    panel.live_button.setChecked(True)
+    for i in range(60):
+        panel.on_hands([make_fist()], 5000 + i * 33)
+    assert panel.recognized_label.text().startswith("Recognized: fist")
+    assert panel.events_list.count() == 1
+    panel.on_hands([], 9000)
+    assert panel.seeing_label.text() == "Seeing: no hand"
+
+    # A new panel finds the saved model.
+    again = TrainPanel(gestures, trained)
+    assert again.train_status.text().startswith("Using the model trained")
+
+
+def test_train_panel_reports_when_there_is_too_little(qapp, tmp_path):
+    gestures = tmp_path / "gestures"
+    panel = TrainPanel(gestures, tmp_path / "trained")
+    panel.start_training()
+    assert wait_until(qapp, lambda: not panel.is_training, timeout=30)
+    assert "Not enough to train" in panel.train_status.text()
+    assert panel.train_button.isEnabled()
+
+
+def test_threshold_slider_updates_recognizer(qapp, tmp_path):
+    gestures, trained = tmp_path / "gestures", tmp_path / "trained"
+    for sample in make_training_set(per_gesture=2):
+        save_sample(sample, gestures)
+    panel = TrainPanel(gestures, trained)
+    panel.start_training()
+    assert wait_until(qapp, lambda: not panel.is_training, timeout=120)
+    panel.threshold_slider.setValue(90)
+    assert panel._recognizer.threshold == 0.9
+    assert panel.threshold_label.text() == "90%"

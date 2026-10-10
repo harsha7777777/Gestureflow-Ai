@@ -1,0 +1,23 @@
+# Runtime dependencies, pinned to exact versions so every user gets the same,
+# tested environment. Supported Python: 3.12 and 3.13 (see README).
+#
+# Why these versions (checked 2026-10-10):
+# - mediapipe 1.0.1: current stable line with the Tasks API (HandLandmarker).
+#   1.1.0 was released only days ago; we move to it after it has settled.
+#   MediaPipe ships wheels for Windows x64/ARM64, macOS Apple Silicon and
+#   Linux. It does NOT ship wheels for Intel Macs (see README, Known limitations).
+# - opencv-contrib-python: MediaPipe itself depends on this package. Do NOT also
+#   install "opencv-python": both provide the same `cv2` module and overwrite
+#   each other, which causes confusing import errors.
+# - numpy 2.5.x requires Python >= 3.12, which sets our minimum Python version.
+
+mediapipe==1.0.1
+opencv-contrib-python==5.0.0.93
+numpy==2.5.3
+scikit-learn==1.9.1
+PySide6==6.12.0
+
+# Added in later milestones (with an explanation at that time):
+#   pynput        - keyboard/mouse actions (M4)
+#   pycaw         - Windows volume control (M7, Windows only)
+# macOS volume uses the built-in `osascript` command, so it needs no package.

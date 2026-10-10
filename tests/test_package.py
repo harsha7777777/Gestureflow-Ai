@@ -29,3 +29,14 @@ def test_python_dash_m_runs():
     )
     assert result.returncode == 0, result.stderr
     assert gestureflow.__version__ in result.stdout
+
+
+def test_download_model_skips_verified_file(monkeypatch, tmp_path, capsys):
+    from gestureflow.detection import model_file
+
+    model = tmp_path / "hand_landmarker.task"
+    model.write_bytes(b"model")
+    monkeypatch.setenv("GESTUREFLOW_MODEL_PATH", str(model))
+    monkeypatch.setattr(model_file, "MODEL_SHA256", model_file.sha256_of(model))
+    assert main(["--download-model"]) == 0
+    assert "already downloaded" in capsys.readouterr().out

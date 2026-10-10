@@ -50,8 +50,18 @@ def check_installation() -> int:
 
 
 def download() -> int:
-    from gestureflow.detection.model_file import ModelDownloadError, download_model
+    from gestureflow.detection.model_file import (
+        MODEL_SHA256,
+        ModelDownloadError,
+        download_model,
+        is_model_present,
+        model_path,
+        sha256_of,
+    )
 
+    if is_model_present() and sha256_of(model_path()) == MODEL_SHA256:
+        print(f"Hand model already downloaded and verified: {model_path()}")
+        return 0
     print("Downloading the MediaPipe hand model (about 8 MB)...")
     try:
         path = download_model()

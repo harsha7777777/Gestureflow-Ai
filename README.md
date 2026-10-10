@@ -4,8 +4,9 @@
 
 <!-- Demo GIF goes here once Milestone 4 is done. -->
 
-> **Status: early development (Milestone 2 of 7).** Live hand tracking and recording your own
-> gesture examples work. Training and computer control come next. See the [roadmap](ROADMAP.md).
+> **Status: early development (Milestone 3 of 7).** Live hand tracking, recording your own
+> gesture examples, training and live recognition work. Computer control (actions) comes next.
+> See the [roadmap](ROADMAP.md).
 
 ## What it does
 
@@ -118,8 +119,51 @@ going anywhere (a grab, a pinch, opening the hand). Otherwise the recording is r
 message saying how far you got. **Undo last** deletes the most recent example of the
 selected gesture.
 
+Each gesture is either a pose or a movement, not both. Typing an existing name selects its type,
+and recording it as the other type is refused. If a gesture shows "(mixed! keep one type)", delete
+the examples of the wrong type from the Terminal, for example:
+
+```bash
+python -m gestureflow --delete-examples pause --kind pose
+```
+
 Examples are stored in `user_data/gestures/<name>/`, one small JSON file each. You can delete
-that folder at any time. Training on these examples arrives in Milestone 3.
+that folder at any time.
+
+## Train and test your gestures
+
+1. Open the **Train & test** tab and click **Train**. It takes a few seconds.
+2. Read the results. The app tests itself on examples it did *not* train on and shows, for
+   example, "Poses: 14 of 15 held-out examples correct". The table below it (a confusion matrix)
+   shows which gestures get mixed up: rows are what you recorded, columns are what the model
+   guessed. With 5 examples per gesture these numbers are rough; record more examples of
+   gestures that get mixed up.
+3. Click **Start live test** and do your gestures. *Seeing* shows the model's current guess and
+   its confidence ("not sure (maybe X)" when the guess is below the confidence needed); *Recognized* shows a gesture once it has passed all the safety checks below.
+   Live test never runs any action.
+
+What has to happen before a gesture counts as recognized:
+
+- **Confidence:** the model must be at least as sure as the *Confidence needed* slider
+  (70% by default). Below that, the app is "not sure" and does nothing.
+- **Smoothing:** a pose must be held for about half a second; a movement must be seen in
+  several frames in a row.
+- **Neutral:** your `neutral` examples are a class of their own and never trigger anything.
+- **Poses only when still, movements only when moving:** a swipe with an open hand can't
+  trigger an "open hand" pose halfway through.
+- **Once per gesture:** holding a pose triggers it once. You have to release it, and wait
+  1.5 seconds, before the same gesture can trigger again. After a movement, the next movement
+  only counts once your hand has rested for a moment (or left the view), so bringing your hand
+  back after a swipe right isn't read as a swipe left.
+
+You can also train from the Terminal, which prints the same results:
+
+```bash
+python -m gestureflow --train
+```
+
+The trained model is saved in `user_data/trained/`. Train again whenever you add or delete
+examples.
 
 ## Troubleshooting
 
@@ -164,7 +208,8 @@ can remap a gesture without retraining. Details: [docs/architecture.md](docs/arc
 
 Webcam frames are processed in memory and discarded; no image or video is ever written to disk.
 Only the hand landmark coordinates (21 points per frame) of the examples you choose to record are
-stored, in the local `user_data/` folder, which you can delete at any time. Nothing is sent over
+stored, together with the model trained from them, in the local `user_data/` folder, which you
+can delete at any time. Nothing is sent over
 the network (the one exception is the one-time hand model download).
 
 ## Known limitations
@@ -172,6 +217,12 @@ the network (the one exception is the one-time hand model download).
 - Intel Macs are not supported (no MediaPipe build).
 - Camera names show as "Camera 0", "Camera 1", ... because OpenCV can't read device names.
 - One hand is tracked at a time.
+- Turning **Mirror view** on or off flips left and right for the model. Keep it the same as when
+  you recorded (it is on by default), or swipe left and swipe right swap.
+- If a pose and the hand shape you swipe with are the same (for example an open palm), holding
+  your hand still after a swipe can trigger that pose. Drop your hand after swiping.
+- Accuracy numbers come from your own few examples and are only a rough guide. Measured results
+  across conditions arrive with Milestone 6.
 
 ## Contributing and license
 

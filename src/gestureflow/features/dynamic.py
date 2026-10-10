@@ -34,6 +34,11 @@ PALM_LANDMARKS = (0, 5, 9, 13, 17)
 
 RESAMPLED_STEPS = 16
 
+# Live recognition looks at the last WINDOW_MS of frames. Training cuts the same
+# kind of windows out of each recorded example, so both see the same thing.
+WINDOW_MS = 1500
+MIN_WINDOW_MS = 400
+
 # Moments (indices into the resampled steps) at which the finger shape is kept,
 # so a grab (open -> fist) differs from a release (fist -> open).
 KEY_STEPS = (0, 5, 10, 15)

@@ -107,3 +107,18 @@ def test_rapid_saves_keep_recording_order(tmp_path):
     paths = [save_sample(make_sample(), tmp_path) for _ in range(12)]
     assert sorted(paths) == paths
     assert len(set(paths)) == 12
+
+
+def test_count_and_delete_by_kind(tmp_path):
+    from gestureflow.storage.samples import count_by_kind, delete_samples_of_kind
+    from tests.conftest import make_pose_sample, make_swipe_sample
+
+    save_sample(make_pose_sample("pause", "open", 1), tmp_path)
+    for i in range(3):
+        save_sample(make_swipe_sample("pause", 0.3, i), tmp_path)
+    assert count_by_kind(tmp_path) == {"pause": {"static": 1, "dynamic": 3}}
+    assert delete_samples_of_kind("pause", "static", tmp_path) == 1
+    assert count_by_kind(tmp_path) == {"pause": {"dynamic": 3}}
+    assert delete_samples_of_kind("pause", "dynamic", tmp_path) == 3
+    assert count_by_kind(tmp_path) == {}  # empty folder removed too
+    assert delete_samples_of_kind("missing", "static", tmp_path) == 0

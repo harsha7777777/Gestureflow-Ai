@@ -4,6 +4,9 @@ python -m gestureflow                    open the live camera window
 python -m gestureflow --camera 1         start with a specific camera
 python -m gestureflow --download-model   download the hand model and exit
 python -m gestureflow --check            check the installation and exit
+python -m gestureflow --train            train on your recorded examples and exit
+python -m gestureflow --delete-examples pause --kind pose
+                                         delete one gesture's pose (or movement) examples
 """
 
 import argparse
@@ -28,6 +31,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--download-model", action="store_true", help="download the hand model and exit"
     )
     parser.add_argument("--check", action="store_true", help="check the installation and exit")
+    parser.add_argument(
+        "--train", action="store_true", help="train on your recorded examples, print results, exit"
+    )
+    parser.add_argument(
+        "--delete-examples", metavar="NAME", help="delete examples of this gesture (needs --kind)"
+    )
+    parser.add_argument(
+        "--kind", choices=("pose", "movement"), help="which examples --delete-examples removes"
+    )
     return parser
 
 
@@ -72,12 +84,71 @@ def download() -> int:
     return 0
 
 
+def train_from_terminal() -> int:
+    from gestureflow.storage.samples import load_samples
+    from gestureflow.training.model import save_model
+    from gestureflow.training.trainer import train
+
+    samples, errors = load_samples()
+    for error in errors:
+        print(f"Skipped a damaged file: {error}", file=sys.stderr)
+    print(f"Loaded {len(samples)} examples.")
+    try:
+        model, report = train(samples)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    path = save_model(model)
+    print()
+    for line in report.summary_lines():
+        print(line)
+    for ev in (report.pose, report.movement):
+        if ev is not None and ev.confusion is not None:
+            print(
+                f"\n{ev.kind.capitalize()} confusion matrix (rows = recorded, columns = guessed):"
+            )
+            width = max(len(c) for c in ev.classes) + 2
+            print(" " * width + "".join(c[:8].rjust(9) for c in ev.classes))
+            for name, row in zip(ev.classes, ev.confusion, strict=True):
+                print(name.ljust(width) + "".join(str(n).rjust(9) for n in row))
+            others = {k: f"{v:.0%}" for k, v in ev.candidates.items()}
+            print(f"Held-out accuracy per algorithm: {others}")
+    for warning in report.warnings:
+        print(f"Note: {warning}")
+    print(f"\nSaved the model to {path}")
+    return 0
+
+
+def delete_examples(name: str, kind: str | None) -> int:
+    from gestureflow.storage.samples import SampleError, count_by_kind, delete_samples_of_kind
+
+    if kind is None:
+        print(
+            "Add --kind pose or --kind movement to say which examples to delete.", file=sys.stderr
+        )
+        return 2
+    try:
+        deleted = delete_samples_of_kind(name, "static" if kind == "pose" else "dynamic")
+    except SampleError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    print(f"Deleted {deleted} {kind} example{'s' if deleted != 1 else ''} of '{name}'.")
+    for gesture, kinds in count_by_kind().items():
+        parts = [f"{n} {'pose' if k == 'static' else 'movement'}" for k, n in sorted(kinds.items())]
+        print(f"  {gesture}: {', '.join(parts)}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.check:
         return check_installation()
     if args.download_model:
         return download()
+    if args.train:
+        return train_from_terminal()
+    if args.delete_examples:
+        return delete_examples(args.delete_examples, args.kind)
 
     # Imported here so --check and --download-model work even if Qt can't start.
     from gestureflow.ui.app import run_app

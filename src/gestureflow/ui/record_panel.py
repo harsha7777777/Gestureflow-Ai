@@ -21,11 +21,14 @@ from gestureflow.storage.samples import (
     NEUTRAL,
     SampleError,
     clean_gesture_name,
+    count_by_kind,
     count_samples,
     delete_last_sample,
     save_sample,
 )
 from gestureflow.training.recorder import RecorderState, SampleRecorder
+
+KIND_WORDS = {"static": ("pose", "poses"), "dynamic": ("movement", "movements")}
 
 TIPS = (
     "Record 5–15 examples of each gesture, moving your hand a little between examples "
@@ -41,6 +44,7 @@ class RecordPanel(QGroupBox):
         self._root = root  # None = the normal user_data/gestures folder
         self._countdown_ms = countdown_ms
         self._recorder: SampleRecorder | None = None
+        self._kinds: dict[str, dict[str, int]] = {}
         self._build_ui()
         self.refresh_counts()
 
@@ -51,6 +55,7 @@ class RecordPanel(QGroupBox):
         self.name_box.setEditable(True)
         self.name_box.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.name_box.lineEdit().setPlaceholderText("e.g. thumbs_up or swipe_left")
+        self.name_box.currentTextChanged.connect(self._match_kind_to_name)
 
         self.static_radio = QRadioButton("Pose (hold still)")
         self.dynamic_radio = QRadioButton("Movement (swipe)")
@@ -106,6 +111,7 @@ class RecordPanel(QGroupBox):
         return self._recorder is not None and not self._recorder.finished
 
     def refresh_counts(self) -> None:
+        self._kinds = count_by_kind(self._root)
         counts = count_samples(self._root)
         current = self.name_box.currentText()
         self.name_box.blockSignals(True)
@@ -117,8 +123,8 @@ class RecordPanel(QGroupBox):
         self.counts_list.clear()
         if not counts:
             self.counts_list.addItem("(none yet)")
-        for name, n in counts.items():
-            self.counts_list.addItem(f"{name}: {n} example{'s' if n != 1 else ''}")
+        for name in counts:
+            self.counts_list.addItem(describe_counts(name, self._kinds.get(name, {})))
         if NEUTRAL not in counts:
             self.counts_list.addItem(f"{NEUTRAL}: 0 (recommended: record some!)")
 
@@ -130,6 +136,14 @@ class RecordPanel(QGroupBox):
             self._show_status(str(exc))
             return
         self.name_box.setEditText(name)
+        existing = self._existing_kind(name)
+        if existing is not None and existing != kind:
+            word = KIND_WORDS[existing][0]
+            self._show_status(
+                f"'{name}' is already a {word}. Choose {word.capitalize()} to add more "
+                "examples, or use a different name."
+            )
+            return
         options = {} if self._countdown_ms is None else {"countdown_ms": self._countdown_ms}
         self._recorder = SampleRecorder(name, kind, **options)
         self._recorder.start()
@@ -169,6 +183,24 @@ class RecordPanel(QGroupBox):
 
     # ------------------------------------------------------------------ helpers
 
+    def _existing_kind(self, name: str) -> str | None:
+        """The kind a gesture already has (None for new names, neutral, or mixed)."""
+        kinds = self._kinds.get(name, {})
+        if name == NEUTRAL or len(kinds) != 1:
+            return None
+        return next(iter(kinds))
+
+    @Slot(str)
+    def _match_kind_to_name(self, text: str) -> None:
+        try:
+            kind = self._existing_kind(clean_gesture_name(text))
+        except SampleError:
+            return
+        if kind == "static":
+            self.static_radio.setChecked(True)
+        elif kind == "dynamic":
+            self.dynamic_radio.setChecked(True)
+
     def _save(self, recorder: SampleRecorder) -> None:
         try:
             save_sample(recorder.result, self._root)
@@ -192,3 +224,17 @@ class RecordPanel(QGroupBox):
         if progress is not None:
             self.progress.setValue(round(progress * 100))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+
+def describe_counts(name: str, kinds: dict[str, int]) -> str:
+    """e.g. "swipe_left: 6 movements" or "pause: 4 movements, 1 pose (mixed!)"."""
+    parts = []
+    for kind in ("static", "dynamic"):
+        n = kinds.get(kind, 0)
+        if n:
+            singular, plural = KIND_WORDS[kind]
+            parts.append(f"{n} {singular if n == 1 else plural}")
+    text = f"{name}: {', '.join(parts) or '0'}"
+    if len(parts) > 1 and name != NEUTRAL:
+        text += " (mixed! keep one type)"
+    return text

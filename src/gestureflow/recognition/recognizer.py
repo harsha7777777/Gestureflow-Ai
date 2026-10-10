@@ -11,9 +11,10 @@ Every camera frame goes through two paths:
   movement is read, so holding a pose can't fire a movement.
 
 Both paths go through their own RecognitionFilter (threshold, smoothing,
-neutral, release, cooldown). After a movement fires, the window is cleared and
-nothing can fire for LOCKOUT_MS, so bringing your hand back after a swipe right
-is not taken as a swipe left.
+neutral, release, cooldown). After a movement fires, the window is cleared,
+nothing can fire for LOCKOUT_MS, and no further movement can fire until the
+hand has been still (or out of view) once. Bringing your hand back after a
+swipe right is therefore not taken as a swipe left.
 
 The output is gesture names only. What a gesture *does* is decided elsewhere
 (mapping, M4); this module doesn't know actions exist.
@@ -26,16 +27,26 @@ from dataclasses import dataclass
 import numpy as np
 
 from gestureflow.detection.landmarks import HandLandmarks
-from gestureflow.features.dynamic import has_enough_motion, palm_trajectory, sequence_features
+from gestureflow.features.dynamic import (
+    MIN_WINDOW_MS,
+    WINDOW_MS,
+    has_enough_motion,
+    motion_amount,
+    sequence_features,
+)
 from gestureflow.features.static import static_features
 from gestureflow.recognition.filter import FilterSettings, GestureEvent, RecognitionFilter
 from gestureflow.training.model import GestureModel
 
-MOVEMENT_WINDOW_MS = 1500  # how much recent motion the movement model sees
-MIN_MOVEMENT_WINDOW_MS = 400
+MOVEMENT_WINDOW_MS = WINDOW_MS  # how much recent motion the movement model sees
+MIN_MOVEMENT_WINDOW_MS = MIN_WINDOW_MS
 MIN_MOVEMENT_FRAMES = 8
-STILL_WINDOW_MS = 300  # a pose is only read when the palm moved less than...
-MAX_STILL_TRAVEL = 0.35  # ...this many hand sizes in the last STILL_WINDOW_MS
+# The hand counts as still when, in the last STILL_WINDOW_MS, the palm moved less
+# than MAX_STILL_TRAVEL hand sizes AND no fingertip moved more than
+# MAX_STILL_SHAPE_CHANGE (so a grab or pinch in place is a movement, not stillness).
+STILL_WINDOW_MS = 300
+MAX_STILL_TRAVEL = 0.35
+MAX_STILL_SHAPE_CHANGE = 0.3
 LOCKOUT_MS = 800  # after a movement, nothing fires for this long
 
 
@@ -48,6 +59,7 @@ class LiveResult:
     source: str  # "pose", "movement" or "" (nothing)
     event: GestureEvent | None = None  # set on the one frame a gesture is recognized
     moving: bool = False
+    guess: str | None = None  # the model's raw guess, even when below the threshold
 
 
 class LiveRecognizer:
@@ -66,6 +78,7 @@ class LiveRecognizer:
         )
         self._frames: deque = deque()  # (t_ms, points, aspect)
         self._locked_until = -1
+        self._movement_armed = True  # False after a movement until the hand rests
 
     @property
     def threshold(self) -> float:
@@ -84,6 +97,7 @@ class LiveRecognizer:
     def update(self, hands: list[HandLandmarks], t_ms: int) -> LiveResult:
         if not hands:
             self.reset()  # gaps break both windows; start fresh when the hand returns
+            self._movement_armed = True
             return LiveResult(None, 0.0, "")
         hand = hands[0]
         self._frames.append((t_ms, hand.points, hand.aspect))
@@ -95,12 +109,20 @@ class LiveRecognizer:
         moving, mv_label, mv_conf = (
             (False, None, 0.0) if still else self._movement_guess(hand.aspect)
         )
-        event = self.movement_filter.update(None if locked else mv_label, mv_conf, t_ms)
+        if still:
+            self._movement_armed = True
+            # Motion from before the hand came to rest belongs to an earlier
+            # movement; the next movement's window starts from the rest.
+            while t_ms - self._frames[0][0] > STILL_WINDOW_MS:
+                self._frames.popleft()
+        blocked = locked or not self._movement_armed
+        event = self.movement_filter.update(None if blocked else mv_label, mv_conf, t_ms)
         if event is not None:
+            self._movement_armed = False
             self._frames.clear()
             self._locked_until = t_ms + LOCKOUT_MS
             self.pose_filter.reset()
-            return LiveResult(event.name, mv_conf, "movement", event, moving=True)
+            return LiveResult(event.name, mv_conf, "movement", event, True, event.name)
 
         pose_label, pose_conf = None, 0.0
         if still and self.model.pose is not None:
@@ -114,9 +136,10 @@ class LiveRecognizer:
             shown, conf, source = mv_label, mv_conf, "movement"
         else:
             shown, conf, source = pose_label, pose_conf, "pose" if pose_label else ""
+        guess = shown
         if shown is not None and conf < self.threshold:
             shown = None  # below the threshold the app is "not sure"
-        return LiveResult(shown, conf, source, event, moving)
+        return LiveResult(shown, conf, source, event, moving, guess)
 
     # ------------------------------------------------------------------ helpers
 
@@ -143,11 +166,12 @@ class LiveRecognizer:
         return True, label, conf
 
     def _is_still(self, aspect: float) -> bool:
-        recent = [p for t, p, _ in self._frames if self._frames[-1][0] - t <= STILL_WINDOW_MS]
-        if len(recent) < 2:
-            return True
+        now = self._frames[-1][0]
+        if now - self._frames[0][0] < STILL_WINDOW_MS * 0.8:
+            return False  # not enough history yet to tell (e.g. right after a movement)
+        recent = [p for t, p, _ in self._frames if now - t <= STILL_WINDOW_MS]
         try:
-            trajectory, _ = palm_trajectory(np.stack(recent), aspect)
+            travel, shape = motion_amount(np.stack(recent), aspect)
         except ValueError:
             return False
-        return float(np.max(np.linalg.norm(trajectory, axis=1))) < MAX_STILL_TRAVEL
+        return travel < MAX_STILL_TRAVEL and shape < MAX_STILL_SHAPE_CHANGE

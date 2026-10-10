@@ -3,7 +3,7 @@ import pytest
 
 from gestureflow.features.dynamic import NUM_SEQUENCE_FEATURES
 from gestureflow.features.static import NUM_STATIC_FEATURES, static_features
-from gestureflow.training.dataset import CROPS, movement_dataset, pose_dataset
+from gestureflow.training.dataset import movement_dataset, pose_dataset, sliding_windows
 from gestureflow.training.model import ModelError, load_model, model_file, save_model
 from gestureflow.training.trainer import check_examples, split_folds, train
 from tests.conftest import make_pose_sample, make_swipe_sample, make_training_set
@@ -26,11 +26,15 @@ def test_pose_dataset_has_one_row_per_frame_and_skips_movements():
     assert data.examples_per_class() == {"neutral": 1, "palm": 1}
 
 
-def test_movement_dataset_adds_crops_that_keep_the_motion():
-    data = movement_dataset([make_swipe_sample("swipe_right", 0.3, 1)])
+def test_movement_dataset_uses_live_like_windows_that_keep_the_motion():
+    sample = make_swipe_sample("swipe_right", 0.3, 1)
+    windows = sliding_windows(sample)
+    assert all(t[-1] - t[0] <= 1500 for _, t in windows)  # never longer than live
+    data = movement_dataset([sample])
     assert data.X.shape[1] == NUM_SEQUENCE_FEATURES
     assert data.original.sum() == 1  # the full recording
-    assert 1 < len(data) <= 1 + len(CROPS)
+    # Windows that end before the swipe started fail the motion check and are left out.
+    assert 1 < len(data) < 1 + len(windows)
     assert set(data.groups) == {0}  # all rows belong to the same example
 
 

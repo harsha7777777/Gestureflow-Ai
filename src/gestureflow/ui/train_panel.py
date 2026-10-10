@@ -256,6 +256,9 @@ class TrainPanel(QWidget):
         result = self._recognizer.update(hands, t_ms)
         if not hands:
             text = "no hand"
+        elif result.label is None and result.guess:
+            # Shown so you can see what almost passed and how close it was.
+            text = f"not sure (maybe {result.guess})"
         elif result.label is None:
             text = "not sure"
         else:

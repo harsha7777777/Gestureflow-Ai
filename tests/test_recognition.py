@@ -138,10 +138,20 @@ def test_swiping_open_palm_is_not_read_as_palm_pose(model):
 def test_hand_coming_back_after_a_swipe_is_ignored(model):
     rec = LiveRecognizer(model)
     there = make_swipe_sample("x", 0.3, seed=79).frames[10:42]
-    back = there[::-1]  # straight back, within the lockout
+    back = there[::-1]  # straight back, without resting in between
     assert len(back) * 33 > LOCKOUT_MS
     events, _ = run(rec, list(there) + list(back))
     assert [e.name for e in events] == ["swipe_right"]
+
+
+def test_second_movement_counts_after_a_short_rest(model):
+    rec = LiveRecognizer(model)
+    right = make_swipe_sample("x", 0.3, seed=80).frames[10:42]
+    left = make_swipe_sample("x", -0.3, seed=81).frames[10:42]
+    rest = [left[0]] * 30  # one second holding still (an open palm, so "palm" may fire)
+    events, _ = run(rec, list(right) + rest + list(left))
+    movements = [e.name for e in events if e.source == "movement"]
+    assert movements == ["swipe_right", "swipe_left"]
 
 
 def test_resting_hand_at_frame_edge_is_not_a_swipe(model):
@@ -160,3 +170,39 @@ def test_threshold_of_one_blocks_everything(model):
     # Random forests can be 100% sure, so only check nothing below 1.0 is shown.
     assert all(r.label is None or r.confidence >= 1.0 for r in results)
     assert all(e.confidence >= 1.0 for e in events)
+
+
+def make_grab_sample(gesture, seed, frames=60):
+    """A movement done in place: open hand closing to a fist (like a screenshot grab)."""
+    from gestureflow.storage.samples import Sample
+
+    rng = np.random.default_rng(seed)
+    center = (0.45 + 0.1 * rng.random(), 0.45 + 0.1 * rng.random())
+    size = 0.22 + 0.1 * rng.random()
+    open_pts, fist_pts = make_open_hand(center, size).points, make_fist(center, size).points
+    seq = []
+    for i in range(frames):
+        f = min(max((i - 20) / 15, 0.0), 1.0)  # closes during frames 20-35
+        points = open_pts + (fist_pts - open_pts) * f
+        seq.append(points + rng.normal(0, 0.002, points.shape).astype(np.float32))
+    return Sample(gesture, "dynamic", np.stack(seq), np.arange(frames) * 33, "Right", 1.0)
+
+
+def test_grab_in_place_is_recognized_live():
+    # Regression: the palm barely moves during a grab, so it used to count as
+    # "still" and never reached the movement model.
+    samples = make_training_set() + [make_grab_sample("screenshot", 700 + i) for i in range(5)]
+    trained, report = train(samples, progress=lambda message: None)
+    assert "screenshot" in trained.movement.classes
+    rec = LiveRecognizer(trained)
+    grab = make_grab_sample("x", seed=799).frames[18:45]
+    events, _ = run(rec, list(grab) + [None] * 5)
+    assert [(e.name, e.source) for e in events] == [("screenshot", "movement")]
+
+
+def test_below_threshold_guess_is_still_reported(model):
+    rec = LiveRecognizer(model, threshold=1.0)
+    _, results = run(rec, [make_half_curled().points * 1.001 + 0.001] * 30)
+    last = results[-1]
+    if last.label is None:  # the guess was below 100%
+        assert last.guess is not None and last.confidence < 1.0

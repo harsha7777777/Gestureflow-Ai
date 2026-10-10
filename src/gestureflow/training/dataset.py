@@ -5,11 +5,11 @@ There are two separate models, because poses and movements are different problem
 - The **pose model** learns from single frames. Every frame of a pose example is
   one training row (a one-second recording gives about 30 rows). Frames from
   "neutral" examples of either kind teach it what an ordinary hand looks like.
-- The **movement model** learns from whole windows of frames. Every movement
-  example gives one row for the full recording plus a few shorter "crops" of
-  it. Live, the app looks at a sliding window that rarely lines up exactly with
-  the movement, and crops teach the model that a slightly early or late window
-  is still the same movement.
+- The **movement model** learns from windows of frames. Live, the app looks at
+  the last 1.5 seconds, a window that slides forward with every frame. Training
+  cuts exactly that kind of window out of each recorded example, ending every
+  0.1 s, so the model learns what the movement looks like through the same
+  sliding window it will see live (early, middle and late in the movement).
 
 Rows remember which example they came from (`groups`), so evaluation can hold
 out whole examples. Testing on frames from an example the model also trained on
@@ -21,16 +21,16 @@ from dataclasses import dataclass
 import numpy as np
 
 from gestureflow.features.dynamic import (
+    MIN_WINDOW_MS,
     NUM_SEQUENCE_FEATURES,
+    WINDOW_MS,
     has_enough_motion,
     sequence_features,
 )
 from gestureflow.features.static import NUM_STATIC_FEATURES, static_features
 from gestureflow.storage.samples import NEUTRAL, Sample
 
-# Shorter windows cut from each movement example: (length, position), both as a
-# fraction of the recording. Position 0 = start, 0.5 = middle, 1 = end.
-CROPS = ((0.8, 0.0), (0.8, 0.5), (0.8, 1.0), (0.6, 0.0), (0.6, 0.5), (0.6, 1.0))
+WINDOW_STEP_MS = 100  # a training window ends every 0.1 s through the recording
 MIN_WINDOW_FRAMES = 6
 
 
@@ -87,23 +87,23 @@ def pose_dataset(samples: list[Sample]) -> Dataset:
     return _build(rows, NUM_STATIC_FEATURES)
 
 
-def crop(sample: Sample, length: float, position: float) -> tuple[np.ndarray, np.ndarray]:
-    """Frames and timestamps of a shorter window inside a movement example."""
-    t = sample.timestamps_ms.astype(np.float64)
-    duration = t[-1] - t[0]
-    start = t[0] + position * duration * (1 - length)
-    keep = (t >= start - 1e-6) & (t <= start + duration * length + 1e-6)
-    return sample.frames[keep], sample.timestamps_ms[keep]
+def sliding_windows(sample: Sample) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Windows like the live ones: up to WINDOW_MS long, ending every WINDOW_STEP_MS."""
+    t = sample.timestamps_ms.astype(np.int64)
+    windows = []
+    for end in range(int(t[0]) + MIN_WINDOW_MS, int(t[-1]) + 1, WINDOW_STEP_MS):
+        keep = (t <= end) & (t > end - WINDOW_MS)
+        if keep.sum() >= MIN_WINDOW_FRAMES:
+            windows.append((sample.frames[keep], t[keep]))
+    return windows
 
 
 def movement_windows(sample: Sample) -> list[tuple[np.ndarray, np.ndarray, bool]]:
-    """(frames, timestamps, is_original) for the full example and its usable crops."""
+    """(frames, timestamps, is_original) for the full example and its usable windows."""
     windows = [(sample.frames, sample.timestamps_ms, True)]
-    for length, position in CROPS:
-        frames, times = crop(sample, length, position)
-        if len(frames) < MIN_WINDOW_FRAMES:
-            continue
-        # A crop that cut the movement out isn't an example of the movement anymore.
+    for frames, times in sliding_windows(sample):
+        # Live, only windows that pass the motion check are ever classified, so
+        # those are the ones to learn from (neutral keeps every window).
         if sample.gesture != NEUTRAL and not has_enough_motion(frames, sample.aspect):
             continue
         windows.append((frames, times, False))
@@ -111,7 +111,7 @@ def movement_windows(sample: Sample) -> list[tuple[np.ndarray, np.ndarray, bool]
 
 
 def movement_dataset(samples: list[Sample]) -> Dataset:
-    """Rows for every movement example (full window plus crops)."""
+    """Rows for every movement example (full recording plus sliding windows)."""
     rows = []
     for index, sample in enumerate(samples):
         if sample.kind != "dynamic" or len(sample.frames) < MIN_WINDOW_FRAMES:

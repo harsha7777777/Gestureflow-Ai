@@ -55,8 +55,9 @@ timestamps only (format described in `storage/samples.py`).
 
 **Two models.** Poses and movements are different problems, so each gets its own classifier
 (`training/trainer.py`). The pose model learns from single frames (every frame of a pose example
-is a row). The movement model learns from whole windows (each movement example plus a few
-shorter crops of it, because the live sliding window rarely lines up exactly with a movement).
+is a row). The movement model learns from the same kind of window live recognition sees: the last 1.5 s,
+cut out of each movement example every 0.1 s (windows that fail the motion check are left out,
+since live they are never classified), plus the full recording.
 `neutral` examples of either kind are a class in the pose model; neutral movements are a class
 in the movement model.
 
@@ -67,13 +68,15 @@ the test part, which would inflate the accuracy. Pose frames of a held-out examp
 into one guess per example, so the confusion matrix counts examples. The algorithm with the
 higher held-out accuracy is then trained on everything (ties go to the random forest).
 
-**Live recognition** (`recognition/recognizer.py`): poses are only read while the palm is still
-(moved less than 0.35 hand sizes in the last 0.3 s); movements are only read while it is not
-still and the last 1.5 s pass the motion check. Each path feeds a `RecognitionFilter`
+**Live recognition** (`recognition/recognizer.py`): poses are only read while the hand is still
+(in the last 0.3 s the palm moved less than 0.35 hand sizes and no fingertip moved more than 0.3,
+so a grab in place counts as moving); movements are only read while it is not still and the last
+1.5 s pass the motion check. Each path feeds a `RecognitionFilter`
 (`recognition/filter.py`): confidence threshold, smoothing (12 of 15 frames for poses, 2 of 3
 windows for movements), neutral never fires, a gesture must be released before it can fire
-again, and a per-gesture cooldown (1.5 s). After a movement fires, the window is cleared and
-nothing fires for 0.8 s. The filter only sees names and numbers, so future inputs (eye tracking,
+again, and a per-gesture cooldown (1.5 s). After a movement fires, the window is cleared,
+nothing fires for 0.8 s, and no other movement fires until the hand has been still once (which
+also drops the older motion from the window). The filter only sees names and numbers, so future inputs (eye tracking,
 voice) can reuse it.
 
 **Model file:** `user_data/trained/gesture_model.joblib` (joblib/pickle, from scikit-learn).

@@ -139,7 +139,7 @@ that folder at any time.
    guessed. With 5 examples per gesture these numbers are rough; record more examples of
    gestures that get mixed up.
 3. Click **Start live test** and do your gestures. *Seeing* shows the model's current guess and
-   its confidence; *Recognized* shows a gesture once it has passed all the safety checks below.
+   its confidence ("not sure (maybe X)" when the guess is below the confidence needed); *Recognized* shows a gesture once it has passed all the safety checks below.
    Live test never runs any action.
 
 What has to happen before a gesture counts as recognized:
@@ -152,8 +152,9 @@ What has to happen before a gesture counts as recognized:
 - **Poses only when still, movements only when moving:** a swipe with an open hand can't
   trigger an "open hand" pose halfway through.
 - **Once per gesture:** holding a pose triggers it once. You have to release it, and wait
-  1.5 seconds, before the same gesture can trigger again. After a movement, nothing triggers
-  for 0.8 seconds, so bringing your hand back after a swipe right isn't read as a swipe left.
+  1.5 seconds, before the same gesture can trigger again. After a movement, the next movement
+  only counts once your hand has rested for a moment (or left the view), so bringing your hand
+  back after a swipe right isn't read as a swipe left.
 
 You can also train from the Terminal, which prints the same results:
 

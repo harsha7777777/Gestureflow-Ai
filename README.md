@@ -146,8 +146,6 @@ at any time.
 ## Known limitations
 
 - Intel Macs are not supported (no MediaPipe build).
-- On macOS, MediaPipe needs a Metal GPU. Every Apple Silicon Mac has one, but macOS virtual
-  machines (including GitHub's CI runners) usually don't, and the app crashes there.
 - Camera names show as "Camera 0", "Camera 1", ... because OpenCV can't read device names.
 - One hand is tracked at a time.
 

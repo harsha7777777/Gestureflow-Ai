@@ -1,4 +1,3 @@
-import os
 from types import SimpleNamespace
 
 import numpy as np
@@ -36,10 +35,6 @@ def test_missing_model_gives_clear_error(tmp_path):
 
 
 @pytest.mark.skipif(not is_model_present(), reason="hand model not downloaded")
-@pytest.mark.skipif(
-    bool(os.environ.get("GESTUREFLOW_NO_METAL")),
-    reason="MediaPipe on macOS needs a Metal GPU, which CI virtual machines lack",
-)
 def test_real_detector_finds_no_hand_in_blank_frame():
     with HandDetector() as detector:
         frame = np.zeros((480, 640, 3), dtype=np.uint8)

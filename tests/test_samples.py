@@ -100,3 +100,10 @@ def test_default_location_is_user_data(monkeypatch, tmp_path):
     monkeypatch.setenv("GESTUREFLOW_USER_DATA_DIR", str(tmp_path))
     path = save_sample(make_sample())
     assert path.is_relative_to(tmp_path / "gestures")
+
+
+def test_rapid_saves_keep_recording_order(tmp_path):
+    # Many saves within the same clock tick must still sort in the order they were made.
+    paths = [save_sample(make_sample(), tmp_path) for _ in range(12)]
+    assert sorted(paths) == paths
+    assert len(set(paths)) == 12

@@ -3,7 +3,7 @@
 Each example is one small JSON file containing ONLY hand landmark coordinates
 and timestamps, never images or video:
 
-    user_data/gestures/<gesture name>/<date>_<id>.json
+    user_data/gestures/<gesture name>/<number>_<date>.json
 
     {
       "format": 1,
@@ -22,7 +22,6 @@ example by hand, and a damaged file only affects that one example.
 import json
 import re
 import shutil
-import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -107,10 +106,17 @@ def save_sample(sample: Sample, root: Path | None = None) -> Path:
     }
     folder = (root or gestures_dir()) / gesture
     folder.mkdir(parents=True, exist_ok=True)
-    # Microseconds in the name keep files in recording order (used by "undo").
-    path = folder / f"{now:%Y%m%d-%H%M%S-%f}_{uuid.uuid4().hex[:6]}.json"
+    # A running number at the front keeps files in recording order (used by "undo").
+    # Timestamps alone can't: on Windows the clock may return the same value for
+    # two examples saved a few milliseconds apart.
+    path = folder / f"{_next_index(folder):05d}_{now:%Y%m%d-%H%M%S}.json"
     path.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
     return path
+
+
+def _next_index(folder: Path) -> int:
+    numbers = [int(p.name.split("_", 1)[0]) for p in folder.glob("*.json") if p.name[:5].isdigit()]
+    return max(numbers, default=0) + 1
 
 
 def load_sample(path: Path) -> Sample:

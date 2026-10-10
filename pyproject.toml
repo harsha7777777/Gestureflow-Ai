@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gestureflow-ai"
+description = "Control your computer with your own, personally trained hand gestures."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Kevin (@harsha7777777)" }]
+requires-python = ">=3.12,<3.14"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+# Dependencies live in requirements*.txt so there is a single place to pin them.
+# `pip install -e .` reads them from there.
+dynamic = ["version", "dependencies", "optional-dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/harsha7777777/gestureflow-ai"
+Issues = "https://github.com/harsha7777777/gestureflow-ai/issues"
+
+[project.scripts]
+gestureflow = "gestureflow.__main__:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "gestureflow.__version__" }
+dependencies = { file = ["requirements.txt"] }
+optional-dependencies.dev = { file = ["requirements-dev.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Lets the tests import `gestureflow` even without `pip install -e .`.
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+markers = [
+    "camera: needs a real webcam; skipped in CI (run manually)",
+]
+
+# ---------------------------------------------------------------------------
+# ruff (linter + formatter)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (unused imports, undefined names, ...)
+    "I",   # import sorting
+    "B",   # bugbear (likely bugs)
+    "UP",  # modern Python syntax
+    "SIM", # simplifications
+    "N",   # naming conventions
+]

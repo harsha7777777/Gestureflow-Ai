@@ -1,0 +1,4 @@
+# Development tools: tests and linting. Install with:
+#   pip install -e ".[dev]"
+pytest==9.1.1
+ruff==0.17.0

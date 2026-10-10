@@ -47,11 +47,15 @@ class HandLandmarks:
         the same scale as x (smaller = closer to the camera).
     handedness: "Left" or "Right", as seen in the (mirrored) image.
     score: the detector's confidence in the handedness label, 0..1.
+    aspect: image width / height. Needed because x and y are normalized by
+        different lengths: on a 640x480 frame, 0.1 in x is 64 px but 0.1 in y
+        is 48 px. Feature extraction multiplies x by this to undo the stretch.
     """
 
     points: np.ndarray
     handedness: str
     score: float
+    aspect: float = 1.0
 
     def __post_init__(self) -> None:
         if self.points.shape != (NUM_LANDMARKS, 3):

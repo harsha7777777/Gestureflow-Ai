@@ -31,6 +31,35 @@ def make_open_hand(center=(0.5, 0.5), size=0.3) -> HandLandmarks:
     return HandLandmarks(points=arr, handedness="Right", score=0.98)
 
 
+def make_fist(center=(0.5, 0.5), size=0.3) -> HandLandmarks:
+    """A synthetic fist: fingertips curled back toward the palm."""
+    hand = make_open_hand(center, size)
+    points = hand.points.copy()
+    palm = points[[0, 5, 9, 13, 17]].mean(axis=0)
+    for tip_chain in ((2, 3, 4), (6, 7, 8), (10, 11, 12), (14, 15, 16), (18, 19, 20)):
+        for joint in tip_chain:
+            points[joint] = palm + (points[joint] - palm) * 0.25
+    return HandLandmarks(points=points, handedness="Right", score=0.97)
+
+
+def make_swipe(dx=0.3, dy=0.0, frames=30, fps=30, start=(0.35, 0.5), size=0.3, jitter=0.0):
+    """A synthetic swipe: an open hand moving (dx, dy) in normalized image units.
+
+    Returns (frames array of shape (T, 21, 3), timestamps in ms).
+    """
+    rng = np.random.default_rng(0)
+    seq, times = [], []
+    for i in range(frames):
+        f = i / (frames - 1)
+        center = (start[0] + dx * f, start[1] + dy * f)
+        points = make_open_hand(center, size).points
+        if jitter:
+            points = points + rng.normal(0, jitter, size=(1, 3)).astype(np.float32)
+        seq.append(points)
+        times.append(round(i * 1000 / fps))
+    return np.stack(seq), np.array(times)
+
+
 @pytest.fixture
 def open_hand() -> HandLandmarks:
     return make_open_hand()

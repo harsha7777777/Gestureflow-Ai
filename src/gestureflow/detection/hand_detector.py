@@ -71,7 +71,8 @@ class HandDetector:
 
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(frame_rgb))
         result = self._landmarker.detect_for_video(image, timestamp_ms)
-        return convert_result(result)
+        height, width = frame_rgb.shape[:2]
+        return convert_result(result, aspect=width / height)
 
     def close(self) -> None:
         self._landmarker.close()
@@ -83,7 +84,7 @@ class HandDetector:
         self.close()
 
 
-def convert_result(result) -> list[HandLandmarks]:
+def convert_result(result, aspect: float = 1.0) -> list[HandLandmarks]:
     """Convert a MediaPipe HandLandmarkerResult into a list of HandLandmarks."""
     hands = []
     for landmarks, handedness in zip(result.hand_landmarks, result.handedness, strict=False):
@@ -96,6 +97,7 @@ def convert_result(result) -> list[HandLandmarks]:
                 points=points,
                 handedness=(best.category_name if best else "Unknown") or "Unknown",
                 score=float(best.score) if best and best.score is not None else 0.0,
+                aspect=aspect,
             )
         )
     return hands

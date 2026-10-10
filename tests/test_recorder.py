@@ -6,7 +6,7 @@ from gestureflow.training.recorder import (
     RecorderState,
     SampleRecorder,
 )
-from tests.conftest import make_open_hand, make_swipe
+from tests.conftest import make_fist, make_open_hand, make_swipe
 
 FRAME_MS = 33
 
@@ -48,7 +48,7 @@ def test_static_without_hand_fails():
 
 
 def swipe_hands(dx):
-    frames, _ = make_swipe(dx=dx, frames=46)  # 1.5 s at 30 fps
+    frames, _ = make_swipe(dx=dx, frames=61)  # 2 s at 30 fps
 
     def at(t):
         i = min(t // FRAME_MS, len(frames) - 1)
@@ -71,6 +71,25 @@ def test_dynamic_without_motion_fails():
     status = feed(rec, swipe_hands(0.0), DYNAMIC_DURATION_MS + 500)
     assert status.state == RecorderState.FAILED
     assert "barely moved" in status.message
+
+
+def test_failure_message_says_how_far_the_hand_moved():
+    rec = SampleRecorder("screenshot", "dynamic", countdown_ms=0)
+    rec.start()
+    status = feed(rec, swipe_hands(0.0), DYNAMIC_DURATION_MS + 500)
+    assert "palm 0%" in status.message and "fingers 0%" in status.message
+
+
+def test_dynamic_grab_in_place_succeeds():
+    rec = SampleRecorder("screenshot", "dynamic", countdown_ms=0)
+    rec.start()
+    open_pts, fist_pts = make_open_hand().points, make_fist().points
+
+    def closing(t):
+        f = min(t / 1000, 1.0)
+        return [make_open_hand().__class__(open_pts + (fist_pts - open_pts) * f, "Right", 0.9)]
+
+    assert feed(rec, closing, DYNAMIC_DURATION_MS + 500).state == RecorderState.DONE
 
 
 def test_dynamic_neutral_needs_no_motion():

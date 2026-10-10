@@ -168,7 +168,7 @@ def test_record_panel_reports_failure_and_saves_nothing(qapp, tmp_path):
     panel.name_box.setEditText("swipe_left")
     panel.dynamic_radio.setChecked(True)
     panel.start_recording()
-    for i in range(60):  # a hand that doesn't move
+    for i in range(75):  # 2.5 s of a hand that doesn't move
         panel.on_hands([make_open_hand()], 1000 + i * 33)
     assert "barely moved" in panel.status_label.text()
     assert count_samples(tmp_path) == {}

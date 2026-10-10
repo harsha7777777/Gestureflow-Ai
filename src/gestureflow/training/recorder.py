@@ -17,12 +17,17 @@ from enum import Enum
 import numpy as np
 
 from gestureflow.detection.landmarks import HandLandmarks
-from gestureflow.features.dynamic import MIN_SWIPE_DISTANCE, has_enough_motion
+from gestureflow.features.dynamic import (
+    MIN_SHAPE_CHANGE,
+    MIN_SWIPE_DISTANCE,
+    has_enough_motion,
+    motion_amount,
+)
 from gestureflow.storage.samples import NEUTRAL, Sample, clean_gesture_name
 
 COUNTDOWN_MS = 3000
 STATIC_DURATION_MS = 1000  # hold the pose for one second
-DYNAMIC_DURATION_MS = 1500  # long enough for one swipe
+DYNAMIC_DURATION_MS = 2000  # one movement, with some slack for a late start
 MIN_STATIC_FRAMES = 5
 MIN_DYNAMIC_FRAMES = 8
 MAX_HAND_GAP_MS = 300  # a movement with the hand missing longer than this is unusable
@@ -131,9 +136,13 @@ class SampleRecorder:
             and self.gesture != NEUTRAL
             and not has_enough_motion(frames, self._aspect)
         ):
+            travel, shape = motion_amount(frames, self._aspect)
             return self._fail(
-                f"The hand barely moved. Move it about {MIN_SWIPE_DISTANCE:g} hand length or more "
-                "across the frame and try again."
+                f"The hand barely moved (palm {travel / MIN_SWIPE_DISTANCE:.0%}, "
+                f"fingers {shape / MIN_SHAPE_CHANGE:.0%} of what is needed). "
+                "Start when it says 'Do the movement now', then either move your hand "
+                "about a palm's width across the frame, or clearly change its shape (like open "
+                "hand to fist)."
             )
         self.result = Sample(
             gesture=self.gesture,

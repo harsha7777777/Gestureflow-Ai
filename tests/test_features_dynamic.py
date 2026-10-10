@@ -6,11 +6,12 @@ from gestureflow.features.dynamic import (
     RESAMPLED_STEPS,
     SEQUENCE_FEATURE_NAMES,
     has_enough_motion,
+    motion_amount,
     motion_stats,
     resample,
     sequence_features,
 )
-from tests.conftest import make_swipe
+from tests.conftest import make_fist, make_open_hand, make_swipe
 
 NET_DX = SEQUENCE_FEATURE_NAMES.index("net_dx")
 NET_DY = SEQUENCE_FEATURE_NAMES.index("net_dy")
@@ -61,6 +62,44 @@ def test_resting_hand_at_frame_edge_is_not_motion():
     # The key safety case: a hand resting at the side of the frame, with sensor noise.
     frames, _ = make_swipe(dx=0.0, start=(0.92, 0.5), jitter=0.003)
     assert not has_enough_motion(frames)
+
+
+def test_short_real_world_swipe_counts():
+    # About a palm's width (0.8 hand sizes) is enough; the old rule wanted 1.0.
+    frames, _ = make_swipe(dx=0.08, size=0.3)  # hand size here is 0.09 image units
+    travel, _ = motion_amount(frames)
+    assert 0.85 < travel < 0.95
+    assert has_enough_motion(frames)
+
+
+def test_there_and_back_movement_counts():
+    # Net displacement is zero, but the hand clearly went somewhere and came back.
+    out, _ = make_swipe(dx=0.15, frames=15)
+    frames = np.concatenate([out, out[::-1]])
+    dx, dy, _ = motion_stats(frames)
+    assert abs(dx) < 1e-6
+    assert has_enough_motion(frames)
+
+
+def grab_frames(steps=30, center=(0.5, 0.5)):
+    """Open hand closing into a fist without the palm moving."""
+    open_pts = make_open_hand(center).points
+    fist_pts = make_fist(center).points
+    return np.stack([open_pts + (fist_pts - open_pts) * (i / (steps - 1)) for i in range(steps)])
+
+
+def test_grab_in_place_counts_as_motion():
+    frames = grab_frames()
+    travel, shape = motion_amount(frames)
+    assert travel < 0.8  # the palm barely moved...
+    assert shape > 1.0  # ...but the fingers clearly did
+    assert has_enough_motion(frames)
+
+
+def test_grab_and_release_have_different_features():
+    grab = grab_frames()
+    t = np.arange(len(grab)) * 33
+    assert not np.allclose(sequence_features(grab, t), sequence_features(grab[::-1], t), atol=0.1)
 
 
 def test_wobbling_hand_is_not_motion():

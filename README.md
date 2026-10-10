@@ -106,13 +106,16 @@ landmark coordinates are saved, never images or video.
 1. Type a name, for example `thumbs_up` or `swipe_left`.
 2. Choose **Pose (hold still)** for a hand shape, or **Movement (swipe)** for a motion.
 3. Click **Record example**. After a 3-second countdown, hold the pose for 1 second, or do the
-   movement within 1.5 seconds.
+   movement within 2 seconds. Start moving when the panel says **Do the movement now**, not during
+   the countdown.
 4. Repeat 5–15 times. Vary your hand position, distance and angle a little each time.
 5. Record some examples named **`neutral`**: your hand resting, typing, scratching your head,
    moving casually. This teaches the app when to do *nothing*.
 
-A movement only counts if your hand travels at least about one hand length; otherwise the
-recording is rejected with a message. **Undo last** deletes the most recent example of the
+A movement only counts if your hand really moves: either it travels about a palm's width across
+the frame (a swipe, even one that comes back), or the fingers clearly change shape without the hand
+going anywhere (a grab, a pinch, opening the hand). Otherwise the recording is rejected with a
+message saying how far you got. **Undo last** deletes the most recent example of the
 selected gesture.
 
 Examples are stored in `user_data/gestures/<name>/`, one small JSON file each. You can delete

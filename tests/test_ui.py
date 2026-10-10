@@ -290,3 +290,14 @@ def test_record_panel_flags_mixed_gestures(qapp, tmp_path):
     save_sample(make_swipe_sample("pause", 0.3, 2), tmp_path)
     panel = RecordPanel(root=tmp_path)
     assert panel.counts_list.item(0).text() == "pause: 1 pose, 1 movement (mixed! keep one type)"
+
+
+def test_model_time_is_shown_in_local_time():
+    from datetime import datetime
+
+    from gestureflow.ui.train_panel import local_time
+
+    utc = "2026-10-10T21:16:05+00:00"
+    expected = datetime.fromisoformat(utc).astimezone().strftime("%Y-%m-%d at %H:%M")
+    assert local_time(utc) == expected
+    assert local_time("not a date") == "not a date"

@@ -164,7 +164,7 @@ class TrainPanel(QWidget):
         try:
             self._set_model(load_model(self._model_root))
             self.train_status.setText(
-                f"Using the model trained {self._model.trained_at.replace('T', ' at ')[:19]}. "
+                f"Using the model trained {local_time(self._model.trained_at)}. "
                 "Train again after recording new examples."
             )
         except ModelError as exc:
@@ -275,6 +275,14 @@ class TrainPanel(QWidget):
         if self._thread is not None:
             self._thread.quit()
             self._thread.wait(30000)
+
+
+def local_time(iso: str) -> str:
+    """'2026-10-10T21:16:05+00:00' -> '2026-10-10 at 23:16' in this computer's time zone."""
+    try:
+        return datetime.fromisoformat(iso).astimezone().strftime("%Y-%m-%d at %H:%M")
+    except ValueError:
+        return iso
 
 
 def _fill_confusion(table: QTableWidget, title: QLabel, name: str, ev: Evaluation | None) -> None:
